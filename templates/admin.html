@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administrace - Knihovnický IS</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .tabs {
+            display: flex;
+            gap: 1rem;
+            border-bottom: 2px solid var(--border-color);
+            margin-bottom: 2rem;
+        }
+
+        .tab-button {
+            padding: 1rem;
+            background: none;
+            border: none;
+            font-size: 1rem;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .tab-button.active {
+            border-bottom-color: var(--light-green);
+            color: var(--light-green);
+            font-weight: 600;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .modal {
+            display: flex;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.hidden {
+            display: none;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: black;
+        }
+
+        .modal.hidden {
+            display: none !important;
+        }
+
+        /* Větší modal */
+        .book-edit-modal-content {
+            max-width: 900px !important;
+            max-height: 90vh !important;
+            overflow-y: auto !important;
+        }
+
+        /* Tabulka exemplářů s scrollem */
+        #copies-container {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: white;
+        }
+
+        #copies-container table {
+            margin: 0;
+            box-shadow: none;
+        }
+
+        #copies-container thead {
+            position: sticky;
+            top: 0;
+            background: var(--light-gray);
+            z-index: 10;
+        }
+
+        /* Formulář pro přidání exempláře */
+        .add-copy-form {
+            background: var(--light-gray);
+            padding: 1rem;
+            border-radius: 6px;
+            margin-top: 1.5rem;
+        }
+
+        .add-copy-form h4 {
+            margin-top: 0;
+            color: var(--dark-green);
+        }
+
+        .add-copy-inputs {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .add-copy-inputs input,
+        .add-copy-inputs select {
+            padding: 0.7rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+
+        .add-copy-inputs input {
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .add-copy-inputs select {
+            min-width: 120px;
+        }
+
+        .add-copy-inputs button {
+            white-space: nowrap;
+        }
+
+        /* Search filter */
+        .search-container {
+            background: var(--light-gray);
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1.5rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .search-container input,
+        .search-container select {
+            padding: 0.7rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.95rem;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .search-container button {
+            white-space: nowrap;
+        }
+
+        .search-label {
+            font-weight: 600;
+            color: var(--dark-green);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <nav>
+            <a class="logo" href="/">IS Knihovny</a>
+            <ul>
+                <li><a href="/catalog">Katalog</a></li>
+                <li><a href="/profile">Profil</a></li>
+                <li><a href="/admin">Admin</a></li>
+                <li><a href="#" onclick="logout()">Odhlásit se</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="container">
+            <h1 id="page-title">Administrační Panel</h1>
+
+            <div id="error-message" class="alert alert-error hidden"></div>
+            <div id="success-message" class="alert alert-success hidden"></div>
+
+            <div class="tabs" id="tabs-container">
+                <button class="tab-button" id="btn-users" style="display:none;" onclick="switchTab('users')">Uživatelé</button>
+                <button class="tab-button active" id="btn-books" onclick="switchTab('books')">Knihy</button>
+                <button class="tab-button" id="btn-reservations" style="display:none;" onclick="switchTab('reservations')">Půjčky</button>
+            </div>
+
+            <!-- Uživatelé -->
+            <div id="users" class="tab-content" style="display:none;">
+                <h2>Správa Uživatelů</h2>
+                
+                <div class="card mb-3">
+                    <h3>Přidat Nového Uživatele</h3>
+                    <form id="add-user-form">
+                        <div class="form-group">
+                            <label for="new-username">Uživatelské jméno</label>
+                            <input type="text" id="new-username" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="new-password">Heslo</label>
+                            <input type="password" id="new-password" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="new-email">Email (volitelně)</label>
+                            <input type="email" id="new-email">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Přidat Uživatele</button>
+                    </form>
+                </div>
+
+                <h3>Existující Uživatelé</h3>
+                <div class="search-container">
+                    <span class="search-label">Hledat:</span>
+                    <input type="text" id="search-users" placeholder="Jméno nebo email..." onkeyup="filterUsers()">
+                    <button class="btn btn-secondary" onclick="filterUsers()">Filtrovat</button>
+                    <button class="btn btn-tertiary" onclick="clearUsersSearch()">Zrušit</button>
+                </div>
+                <table id="users-table">
+                    <thead>
+                        <tr>
+                            <th>Uživatelské jméno</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Status</th>
+                            <th>Akce</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <!-- Knihy -->
+            <div id="books" class="tab-content active">
+                <h2>Správa Knih</h2>
+
+                <div class="card mb-3">
+                    <h3>Přidat Novou Knihu</h3>
+                    <form id="add-book-form">
+                        <div class="form-group">
+                            <label for="book-title">Název</label>
+                            <input type="text" id="book-title" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="book-author">Autor</label>
+                            <input type="text" id="book-author" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="book-isbn">ISBN</label>
+                            <input type="text" id="book-isbn" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="book-publisher">Vydavatel</label>
+                            <input type="text" id="book-publisher">
+                        </div>
+                        <div class="form-group">
+                            <label for="book-year">Rok vydání</label>
+                            <input type="number" id="book-year">
+                        </div>
+                        <div class="form-group">
+                            <label for="book-pages">Počet stran</label>
+                            <input type="number" id="book-pages">
+                        </div>
+                        <div class="form-group">
+                            <label for="book-category">Kategorie</label>
+                            <input type="text" id="book-category">
+                        </div>
+                        <div class="form-group">
+                            <label for="book-description">Popis</label>
+                            <textarea id="book-description"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Přidat Knihu</button>
+                    </form>
+                </div>
+
+                <h3>Existující Knihy</h3>
+                <div class="search-container">
+                    <span class="search-label">Hledat:</span>
+                    <input type="text" id="search-books" placeholder="Název, autor nebo ISBN..." onkeyup="filterBooks()">
+                    <button class="btn btn-secondary" onclick="filterBooks()">Filtrovat</button>
+                    <button class="btn btn-tertiary" onclick="clearBooksSearch()">Zrušit</button>
+                </div>
+                <table id="books-table">
+                    <thead>
+                        <tr>
+                            <th>Název</th>
+                            <th>Autor</th>
+                            <th>ISBN</th>
+                            <th>Kategorie</th>
+                            <th>Akce</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <!-- Půjčky -->
+            <div id="reservations" class="tab-content" style="display:none;">
+                <h2>Správa Půjček</h2>
+
+                <h3>Aktivní Půjčky</h3>
+                <div class="search-container">
+                    <span class="search-label">Hledat podle:</span>
+                    <input type="text" id="search-reservations" placeholder="Jméno čtenáře nebo kniha..." onkeyup="filterReservations()">
+                    <button class="btn btn-secondary" onclick="filterReservations()">Filtrovat</button>
+                    <button class="btn btn-tertiary" onclick="clearReservationsSearch()">Zrušit</button>
+                </div>
+                <table id="reservations-table">
+                    <thead>
+                        <tr>
+                            <th>Čtenář</th>
+                            <th>Kniha</th>
+                            <th>Inv. Číslo</th>
+                            <th>Půjčeno od</th>
+                            <th>Splatnost</th>
+                            <th>Status</th>
+                            <th>Akce</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal pro profil uživatele -->
+    <div id="user-profile-modal" class="modal hidden">
+        <div class="modal-content" style="max-width:700px;">
+            <span class="close" onclick="closeUserProfileModal()">&times;</span>
+            <h2 id="modal-user-name"></h2>
+            <div id="modal-user-body"></div>
+        </div>
+    </div>
+
+    <!-- Modal pro editaci knihy -->
+    <div id="book-edit-modal" class="modal hidden">
+        <div class="modal-content book-edit-modal-content" style="max-width:900px;">
+            <span class="close" onclick="closeBookEditModal()">&times;</span>
+            <h2>Editace Knihy</h2>
+            <form id="book-edit-form">
+                <div class="form-group">
+                    <label for="edit-book-title">Název</label>
+                    <input type="text" id="edit-book-title" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-book-author">Autor</label>
+                    <input type="text" id="edit-book-author" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-book-isbn">ISBN</label>
+                    <input type="text" id="edit-book-isbn" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-book-publisher">Vydavatel</label>
+                    <input type="text" id="edit-book-publisher">
+                </div>
+                <div class="form-group">
+                    <label for="edit-book-year">Rok vydání</label>
+                    <input type="number" id="edit-book-year">
+                </div>
+                <div class="form-group">
+                    <label for="edit-book-pages">Počet stran</label>
+                    <input type="number" id="edit-book-pages">
+                </div>
+                <div class="form-group">
+                    <label for="edit-book-category">Kategorie</label>
+                    <input type="text" id="edit-book-category">
+                </div>
+                <div class="form-group">
+                    <label for="edit-book-description">Popis</label>
+                    <textarea id="edit-book-description" rows="4"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Uložit změny</button>
+            </form>
+            
+            <h3 style="margin-top:2rem; margin-bottom:0.5rem;">Exempláře</h3>
+            <div id="copies-container"></div>
+            
+            <div class="add-copy-form">
+                <h4>Přidat nový exemplář</h4>
+                <div class="add-copy-inputs">
+                    <input type="text" id="new-copy-inv" placeholder="Inventární číslo" maxlength="50">
+                    <select id="new-copy-condition">
+                        <option value="dobrá">Dobrá</option>
+                        <option value="přijatelná">Přijatelná</option>
+                        <option value="poškozená">Poškozená</option>
+                    </select>
+                    <button onclick="addCopy()" class="btn btn-secondary">Přidat exemplář</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 Knihovnický informační systém. Všechna práva vyhrazena.</p>
+    </footer>
+
+    <script>
+        const token = localStorage.getItem('token');
+        const user = localStorage.getItem('user');
+
+        if (!token || !user) {
+            window.location.href = '/login';
+        }
+
+        const userData = JSON.parse(user);
+        
+        if (userData.role !== 'administrátor') {
+            window.location.href = '/';
+        }
+
+        // Globální proměnné pro uložení dat
+        let allUsers = [];
+        let allBooks = [];
+        let allReservations = [];
+
+        function switchTab(tabName) {
+            // Skrýt všechny taby
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+                tab.style.display = 'none';
+            });
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Zobrazit vybraný tab
+            const activeTab = document.getElementById(tabName);
+            activeTab.classList.add('active');
+            activeTab.style.display = 'block';
+            
+            // Nastavit active button
+            event.target.classList.add('active');
+        }
+
+        // USERS
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/admin/users', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    const users = await response.json();
+                    allUsers = users; // Uložit do globální proměnné
+                    displayUsers(users);
+                }
+            } catch (error) {
+                showError('Chyba při načítání uživatelů');
+            }
+        }
+
+        function displayUsers(users) {
+            const tbody = document.querySelector('#users-table tbody');
+            tbody.innerHTML = '';
+
+            users.forEach(u => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${u.username}</td>
+                    <td>${u.email || 'N/A'}</td>
+                    <td>
+                        <select onchange="changeRole(${u.id}, this.value)" class="form-control">
+                            <option value="čtenář" ${u.role === 'čtenář' ? 'selected' : ''}>Čtenář</option>
+                            <option value="knihovník" ${u.role === 'knihovník' ? 'selected' : ''}>Knihovník</option>
+                            <option value="administrátor" ${u.role === 'administrátor' ? 'selected' : ''}>Administrátor</option>
+                        </select>
+                    </td>
+                    <td>
+                        <span class="status status-active">${u.is_active ? 'Aktivní' : 'Neaktivní'}</span>
+                    </td>
+                    <td style="display:flex; gap:0.5rem;">
+                        <button onclick="viewUserProfile(${u.id}, '${u.username}')" class="btn btn-primary" style="width: auto; padding: 0.5rem 1rem;">Profil</button>
+                        <button onclick="showChangePasswordModal(${u.id}, '${u.username}')" class="btn btn-warning" style="width: auto; padding: 0.5rem 1rem;">Heslo</button>
+                        <button onclick="deleteUser(${u.id})" class="btn btn-danger" style="width: auto; padding: 0.5rem 1rem;">Smazat</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function filterUsers() {
+            const searchTerm = document.getElementById('search-users').value.toLowerCase();
+            const filtered = allUsers.filter(u => 
+                u.username.toLowerCase().includes(searchTerm) || 
+                (u.email && u.email.toLowerCase().includes(searchTerm))
+            );
+            displayUsers(filtered);
+        }
+
+        function clearUsersSearch() {
+            document.getElementById('search-users').value = '';
+            displayUsers(allUsers);
+        }
+
+        function filterBooks() {
+            const searchTerm = document.getElementById('search-books').value.toLowerCase();
+            const filtered = allBooks.filter(b => 
+                b.title.toLowerCase().includes(searchTerm) || 
+                b.author.toLowerCase().includes(searchTerm) || 
+                (b.isbn && b.isbn.toLowerCase().includes(searchTerm))
+            );
+            displayBooks(filtered);
+        }
+
+        function clearBooksSearch() {
+            document.getElementById('search-books').value = '';
+            displayBooks(allBooks);
+        }
+
+        function filterReservations() {
+            const searchTerm = document.getElementById('search-reservations').value.toLowerCase();
+            const filtered = allReservations.filter(r => 
+                (r.user?.username && r.user.username.toLowerCase().includes(searchTerm)) || 
+                (r.book_copy?.book?.title && r.book_copy.book.title.toLowerCase().includes(searchTerm))
+            );
+            displayReservations(filtered);
+        }
+
+        function clearReservationsSearch() {
+            document.getElementById('search-reservations').value = '';
+            displayReservations(allReservations);
+        }
+
+        async function changeRole(userId, newRole) {
+            try {
+                const response = await fetch(`/api/admin/users/${userId}/role`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        role: newRole
+                    })
+                });
+
+                if (response.ok) {
+                    showSuccess('Role byla změněna');
+                    loadUsers();
+                } else {
+                    showError('Chyba při změně role');
+                }
+            } catch (error) {
+                showError('Chyba při komunikaci se serverem');
+            }
+        }
+
+        async function deleteUser(userId) {
+            if (!confirm('Opravdu chcete smazat tohoto uživatele?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/admin/users/${userId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    showSuccess('Uživatel byl smazán');
+                    loadUsers();
+                } else {
+                    showError('Chyba při mazání uživatele');
+                }
+            } catch (error) {
+                showError('Chyba při komunikaci se serverem');
+            }
+        }
+
+        async function viewUserProfile(userId, username) {
+            try {
+                const response = await fetch(`/api/admin/users/${userId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('modal-user-name').textContent = `${data.username} (${data.role})`;
+                    let html = '';
+                    html += `<p><strong>Email:</strong> ${data.email || 'N/A'}</p>`;
+                    html += `<p><strong>Jméno:</strong> ${data.full_name || 'N/A'}</p>`;
+                    html += `<p><strong>Registrován:</strong> ${new Date(data.created_at).toLocaleString('cs-CZ')}</p>`;
+
+                    // Oddělení aktivních a uzavřených půjček
+                    const active = (data.reservations || []).filter(r => r.status === 'aktivní');
+                    const closed = (data.reservations || []).filter(r => r.status !== 'aktivní');
+
+                    // Aktivní půjčky
+                    html += '<h3 style="color: var(--dark-green); margin-top: 1.5rem;">Aktivní Půjčky</h3>';
+                    if (active.length === 0) {
+                        html += '<p style="color: #666;">Žádné aktivní půjčky</p>';
+                    } else {
+                        html += '<table class="table" style="margin-bottom: 1.5rem;"><thead><tr><th>Kniha</th><th>Inv. číslo</th><th>Půjčeno</th><th>Splatnost</th><th>Stav</th><th>Akce</th></tr></thead><tbody>';
+                        active.forEach(res => {
+                            const due = res.due_date ? new Date(res.due_date).toLocaleDateString('cs-CZ') : 'N/A';
+                            const resDate = res.reservation_date ? new Date(res.reservation_date).toLocaleDateString('cs-CZ') : 'N/A';
+                            const dueDate = new Date(res.due_date);
+                            const today = new Date();
+                            const isOverdue = dueDate < today;
+                            html += `<tr style="${isOverdue ? 'background-color: #ffe6e6;' : ''}">`;
+                            html += `<td><strong>${res.book_copy?.book?.title || 'Neznámá'}</strong></td>`;
+                            html += `<td>${res.book_copy?.inventory_number || 'N/A'}</td>`;
+                            html += `<td>${resDate}</td>`;
+                            html += `<td style="color: ${isOverdue ? '#d32f2f' : '#666'}; font-weight: ${isOverdue ? 'bold' : 'normal'}">${due}${isOverdue ? ' (PŘESPLÁCENO)' : ''}</td>`;
+                            html += `<td><span class="status status-active">Půjčeno</span></td>`;
+                            html += `<td><button class="btn btn-secondary" onclick="returnBook(${res.id}); closeUserProfileModal();" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">Vrátit</button></td>`;
+                            html += `</tr>`;
+                        });
+                        html += '</tbody></table>';
+                    }
+
+                    // Historické půjčky
+                    html += '<h3 style="color: var(--dark-green);">Historie Půjček</h3>';
+                    if (closed.length === 0) {
+                        html += '<p style="color: #666;">Žádné uzavřené půjčky</p>';
+                    } else {
+                        html += '<table class="table" style="font-size: 0.9rem;"><thead><tr><th>Kniha</th><th>Inv. číslo</th><th>Půjčeno</th><th>Vráceno</th><th>Status</th></tr></thead><tbody>';
+                        closed.forEach(res => {
+                            const due = res.due_date ? new Date(res.due_date).toLocaleDateString('cs-CZ') : 'N/A';
+                            const resDate = res.reservation_date ? new Date(res.reservation_date).toLocaleDateString('cs-CZ') : 'N/A';
+                            html += `<tr style="opacity: 0.8;">`;
+                            html += `<td>${res.book_copy?.book?.title || 'Neznámá'}</td>`;
+                            html += `<td>${res.book_copy?.inventory_number || 'N/A'}</td>`;
+                            html += `<td>${resDate}</td>`;
+                            html += `<td>${due}</td>`;
+                            html += `<td><span class="status" style="background: #e0e0e0; color: #666;">${res.status}</span></td>`;
+                            html += `</tr>`;
+                        });
+                        html += '</tbody></table>';
+                    }
+
+                    document.getElementById('modal-user-body').innerHTML = html;
+                    document.getElementById('user-profile-modal').classList.remove('hidden');
+                } else {
+                    showError('Chyba při načítání profilu uživatele');
+                }
+            } catch (error) {
+                showError('Chyba při komunikaci se serverem');
+            }
+        }
+
+        function closeUserProfileModal() {
+            document.getElementById('user-profile-modal').classList.add('hidden');
+            document.getElementById('modal-user-name').textContent = '';
+            document.getElementById('modal-user-body').innerHTML = '';
+        }
+
+        const addUserForm = document.getElementById('add-user-form');
+        addUserForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('new-username').value;
+            const password = document.getElementById('new-password').value;
+            const email = document.getElementById('new-email').value;
+
+            try {
+                const response = await fetch('/api/admin/users', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username,
+                        password,
+                        email: email || null
+                    })
+                });
+
+                if (response.ok) {
+                    showSuccess('Uživatel byl přidán');
+                    addUserForm.reset();
+                    loadUsers();
+                } else {
+                    const error = await response.json();
+                    showError(error.detail || 'Chyba při přidávání uživatele');
+                }
+            } catch (error) {
+                showError('Chyba při komunikaci se serverem');
+            }
+        });
+
+        // BOOKS
+        async function loadBooks() {
+            try {
+                const response = await fetch('/api/books/', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    const books = await response.json();
+                    allBooks = books; // Uložit do globální proměnné
+                    displayBooks(books);
+                }
+            } catch (error) {
+                showError('Chyba při načítání knih');
+            }
+        }
+
+        function displayBooks(books) {
+            const tbody = document.querySelector('#books-table tbody');
+            tbody.innerHTML = '';
+
+            books.forEach(book => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${book.title}</td>
+                    <td>${book.author}</td>
+                    <td>${book.isbn}</td>
+                    <td>${book.category || 'N/A'}</td>
+                    <td>
+                        <button onclick="openBookEditModal(${book.id})" class="btn btn-secondary" style="width: auto; padding: 0.5rem 1rem;">Editovat</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        const addBookForm = document.getElementById('add-book-form');
+        addBookForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const bookData = {
+                title: document.getElementById('book-title').value,
+                author: document.getElementById('book-author').value,
+                isbn: document.getElementById('book-isbn').value,
+                publisher: document.getElementById('book-publisher').value,
+                publication_year: parseInt(document.getElementById('book-year').value) || null,
+                pages: parseInt(document.getElementById('book-pages').value) || null,
+                category: document.getElementById('book-category').value,
+                description: document.getElementById('book-description').value
+            };
+
+            try {
+                const response = await fetch('/api/books/', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(bookData)
+                });
+
+                if (response.ok) {
+                    showSuccess('Kniha byla přidána');
+                    addBookForm.reset();
+                    loadBooks();
+                } else {
+                    const error = await response.json();
+                    showError(error.detail || 'Chyba při přidávání knihy');
+                }
+            } catch (error) {
+                showError('Chyba při komunikaci se serverem');
+            }
+        });
+
+        // RESERVATIONS
+        async function loadReservations() {
+            try {
+                const response = await fetch('/api/reservations/', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    const reservations = await response.json();
+                    allReservations = reservations; // Uložit do globální proměnné
+                    displayReservations(reservations);
+                }
+            } catch (error) {
+                showError('Chyba při načítání půjček');
+            }
+        }
+
+        function displayReservations(reservations) {
+            const tbody = document.querySelector('#reservations-table tbody');
+            tbody.innerHTML = '';
+
+            if (reservations.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center">Žádné aktivní půjčky</td></tr>';
+                return;
+            }
+
+            reservations.forEach(res => {
+                const row = document.createElement('tr');
+                const dueDate = new Date(res.due_date);
+                const isOverdue = dueDate < new Date();
+
+                row.innerHTML = `
+                    <td><strong>${res.user?.username || 'Neznámý'}</strong></td>
+                    <td>${res.book_copy?.book?.title || 'Neznámá'}</td>
+                    <td>${res.book_copy?.inventory_number || 'N/A'}</td>
+                    <td>${new Date(res.reservation_date).toLocaleDateString('cs-CZ')}</td>
+                    <td>${dueDate.toLocaleDateString('cs-CZ')}</td>
+                    <td>
+                        <span class="status ${isOverdue ? 'status-late' : 'status-active'}">
+                            ${isOverdue ? 'Zpoždění' : 'Aktivní'}
+                        </span>
+                    </td>
+                    <td>
+                        <button onclick="returnBook(${res.id})" class="btn btn-secondary" style="width: auto; padding: 0.5rem 1rem;">Vrátit</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        async function returnBook(reservationId) {
+            try {
+                const response = await fetch('/api/reservations/return', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        reservation_id: reservationId
+                    })
+                });
+
+                if (response.ok) {
+                    showSuccess('Kniha byla vrácena');
+                    loadReservations();
+                } else {
+                    showError('Chyba při vrácení knihy');
+                }
+            } catch (error) {
+                showError('Chyba při komunikaci se serverem');
+            }
+        }
+
+        function showError(message) {
+            const errorMessage = document.getElementById('error-message');
+            errorMessage.textContent = message;
+            errorMessage.classList.remove('hidden');
+            setTimeout(() => errorMessage.classList.add('hidden'), 5000);
+        }
+
+        function showSuccess(message) {
+            const successMessage = document.getElementById('success-message');
+            successMessage.textContent = message;
+            successMessage.classList.remove('hidden');
+            setTimeout(() => successMessage.classList.add('hidden'), 5000);
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+        }
+
+        async function showChangePasswordModal(userId, username) {
+            const newPass = prompt(`Nové heslo pro uživatele: ${username}`);
+            if (newPass && newPass.length >= 6) {
+                try {
+                    const response = await fetch(`/api/admin/users/${userId}/change-password`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ user_id: userId, new_password: newPass })
+                    });
+
+                    if (response.ok) {
+                        showSuccess(`Heslo uživatele ${username} bylo změněno`);
+                    } else {
+                        const err = await response.json();
+                        showError(err.detail || 'Chyba při změně hesla');
+                    }
+                } catch (error) {
+                    showError('Chyba při komunikaci se serverem');
+                }
+            } else if (newPass) {
+                showError('Heslo musí mít alespoň 6 znaků');
+            }
+        }
+
+        async function openBookEditModal(bookId) {
+            try {
+                const response = await fetch(`/api/books/${bookId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) {
+                    showError('Chyba při načítání knihy');
+                    return;
+                }
+
+                const book = await response.json();
+
+                // Naplnit formulář
+                document.getElementById('edit-book-title').value = book.title;
+                document.getElementById('edit-book-author').value = book.author;
+                document.getElementById('edit-book-isbn').value = book.isbn;
+                document.getElementById('edit-book-publisher').value = book.publisher || '';
+                document.getElementById('edit-book-year').value = book.publication_year || '';
+                document.getElementById('edit-book-pages').value = book.pages || '';
+                document.getElementById('edit-book-category').value = book.category || '';
+                document.getElementById('edit-book-description').value = book.description || '';
+
+                // Načíst exempláře
+                const copiesResponse = await fetch(`/api/books/${bookId}/copies`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                let copies = [];
+                if (copiesResponse.ok) {
+                    copies = await copiesResponse.json();
+                }
+
+                // Zobrazit exempláře
+                displayCopies(copies);
+
+                // Uložit ID pro later
+                window.currentEditingBookId = bookId;
+
+                document.getElementById('book-edit-modal').classList.remove('hidden');
+            } catch (error) {
+                showError('Chyba při načítání knihy');
+            }
+        }
+
+        function displayCopies(copies) {
+            const container = document.getElementById('copies-container');
+            container.innerHTML = '';
+
+            if (copies.length === 0) {
+                container.innerHTML = '<p><em>Zatím žádné exempláře</em></p>';
+                return;
+            }
+
+            const table = document.createElement('table');
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>Inv. Číslo</th>
+                        <th>Stav</th>
+                        <th>Dostupnost</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${copies.map(c => `
+                        <tr>
+                            <td>${c.inventory_number}</td>
+                            <td>${c.condition}</td>
+                            <td><span class="status ${c.is_available ? 'status-available' : 'status-unavailable'}">${c.is_available ? 'Dostupné' : 'Nedostupné'}</span></td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            `;
+            container.appendChild(table);
+        }
+
+        function closeBookEditModal() {
+            document.getElementById('book-edit-modal').classList.add('hidden');
+            window.currentEditingBookId = null;
+        }
+
+        async function addCopy() {
+            const inv = document.getElementById('new-copy-inv').value;
+            const condition = document.getElementById('new-copy-condition').value;
+
+            if (!inv) {
+                showError('Zadejte inventární číslo');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/books/${window.currentEditingBookId}/copies`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ inventory_number: inv, condition })
+                });
+
+                if (response.ok) {
+                    showSuccess('Exemplář přidán');
+                    document.getElementById('new-copy-inv').value = '';
+                    openBookEditModal(window.currentEditingBookId);
+                } else {
+                    const err = await response.json();
+                    showError(err.detail || 'Chyba při přidávání exempláře');
+                }
+            } catch (error) {
+                showError('Chyba při komunikaci se serverem');
+            }
+        }
+
+        document.getElementById('book-edit-form')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const bookData = {
+                title: document.getElementById('edit-book-title').value,
+                author: document.getElementById('edit-book-author').value,
+                description: document.getElementById('edit-book-description').value,
+                publisher: document.getElementById('edit-book-publisher').value,
+                publication_year: parseInt(document.getElementById('edit-book-year').value) || null,
+                pages: parseInt(document.getElementById('edit-book-pages').value) || null,
+                category: document.getElementById('edit-book-category').value
+            };
+
+            try {
+                const response = await fetch(`/api/books/${window.currentEditingBookId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(bookData)
+                });
+
+                if (response.ok) {
+                    showSuccess('Kniha byla aktualizována');
+                    closeBookEditModal();
+                    loadBooks();
+                } else {
+                    const err = await response.json();
+                    showError(err.detail || 'Chyba při aktualizaci knihy');
+                }
+            } catch (error) {
+                showError('Chyba při komunikaci se serverem');
+            }
+        });
+
+        // Inicializace - zobrazit taby na základě role
+        function initAdminPanel() {
+            const isAdmin = userData.role === 'administrátor';
+            const isLibrarian = userData.role === 'knihovník';
+
+            // Nastavit titulek
+            document.getElementById('page-title').textContent = 
+                isAdmin ? 'Administrační Panel' : 'Správa Knih';
+
+            // Zobrazit/skrýt taby na základě role
+            document.getElementById('btn-users').style.display = isAdmin ? 'block' : 'none';
+            document.getElementById('btn-reservations').style.display = isAdmin ? 'block' : 'none';
+
+            // Nastavit výchozí tab
+            if (isAdmin) {
+                document.getElementById('users').classList.add('active');
+                document.getElementById('users').style.display = 'block';
+                document.getElementById('books').classList.remove('active');
+                document.getElementById('books').style.display = 'none';
+                document.getElementById('btn-users').classList.add('active');
+                document.getElementById('btn-books').classList.remove('active');
+                loadUsers();
+            } else if (isLibrarian) {
+                document.getElementById('books').classList.add('active');
+                document.getElementById('books').style.display = 'block';
+                document.getElementById('btn-books').classList.add('active');
+            }
+
+            loadBooks();
+            if (isAdmin) loadReservations();
+        }
+
+        // Povolit pouze adminu a knihovníkovi
+        if (userData.role !== 'administrátor' && userData.role !== 'knihovník') {
+            window.location.href = '/';
+        }
+
+        // Inicializace
+        initAdminPanel();
+
+        // Obnovit data každých 30 sekund
+        setInterval(() => {
+            if (userData.role === 'administrátor') {
+                loadUsers();
+                loadReservations();
+            }
+            loadBooks();
+        }, 30000);
+    </script>
+</body>
+</html>

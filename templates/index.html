@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Domovská stránka - Knihovnický IS</title>
+    <link rel="icon" href="/static/icon.png" type="image/png">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header>
+        <nav>
+            <a class="logo" href="/">IS Knihovny</a>
+            <ul>
+                <li><a href="/catalog">Katalog</a></li>
+                <li><a href="/profile">Profil</a></li>
+                <li><a id="admin-link" href="/admin" class="hidden">Admin</a></li>
+                <li><a href="#" onclick="logout()">Odhlásit se</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="container">
+            <h1>Vítejte v Informačním Systému </h1>
+            
+            <div class="grid mt-4">
+                <div class="card">
+                    <h3>📚 Katalog Knih</h3>
+                    <p>Procházejte rozsáhlý katalog našich knih, vyhledávejte podle jména autora, názvu nebo kategorie.</p>
+                    <a href="/catalog" class="btn btn-primary mt-2">Jít do katalogu</a>
+                </div>
+
+                <div class="card">
+                    <h3>👤 Můj Profil</h3>
+                    <p>Spravujte si svůj profil, zobrazte si půjčené knihy a změňte si heslo.</p>
+                    <a href="/profile" class="btn btn-primary mt-2">Jít na profil</a>
+                </div>
+
+                <div class="card" id="admin-card" style="display: none;">
+                    <h3>⚙️ Administrace</h3>
+                    <p>Spravujte uživatele, knihy a exempláře v systému.</p>
+                    <a href="/admin" class="btn btn-primary mt-2">Jít na admin panel</a>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <h2>O Systému</h2>
+                <div class="card">
+                    <p>Knihovnický Informační Systém je moderní webová aplikace pro správu knihovny. Umožňuje čtenářům procházet katalog knih, půjčovat si exempláře a spravovat svůj profil. Knihovníci mohou spravovat knihy a vraťovat exempláře, zatímco administrátoři mají přístup k úplné správě systému.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2025. Všechna práva vyhrazena.</p>
+    </footer>
+
+    <script>
+        // Kontrola přihlášení
+        function checkAuth() {
+            const token = localStorage.getItem('token');
+            const user = localStorage.getItem('user');
+
+            if (!token || !user) {
+                window.location.href = '/login';
+                return;
+            }
+
+            const userData = JSON.parse(user);
+            
+            // Zobrazit admin panel pokud je uživatel admin
+            if (userData.role === 'administrátor') {
+                document.getElementById('admin-link').classList.remove('hidden');
+                document.getElementById('admin-card').style.display = 'block';
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+        }
+
+        checkAuth();
+    </script>
+</body>
+</html>

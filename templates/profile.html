@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profil - Knihovnický IS</title>
+    <link rel="icon" href="/static/icon.png" type="image/png">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header>
+        <nav>
+            <a class="logo" href="/">IS Knihovny</a>
+            <ul>
+                <li><a href="/catalog">Katalog</a></li>
+                <li><a href="/profile">Profil</a></li>
+                <li><a id="admin-link" href="/admin" class="hidden">Admin</a></li>
+                <li><a href="#" onclick="logout()">Odhlásit se</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="container">
+            <h1>Můj Profil</h1>
+
+            <div id="error-message" class="alert alert-error hidden"></div>
+            <div id="success-message" class="alert alert-success hidden"></div>
+
+            <div class="profile-header">
+                <div class="profile-avatar">👤</div>
+                <div class="profile-info">
+                    <h2 id="user-name"></h2>
+                    <p><strong>Role:</strong> <span id="user-role"></span></p>
+                    <p><strong>Email:</strong> <span id="user-email"></span></p>
+                    <p><strong>Registrován:</strong> <span id="user-created"></span></p>
+                </div>
+            </div>
+
+            <div class="grid mt-4">
+                <div class="card">
+                    <h3>Změna Hesla</h3>
+                    <form id="password-form">
+                        <div class="form-group">
+                            <label for="old-password">Staré heslo</label>
+                            <input type="password" id="old-password" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="new-password">Nové heslo</label>
+                            <input type="password" id="new-password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Změnit heslo</button>
+                    </form>
+                </div>
+            </div>
+
+            <h2 class="mt-4">Moje Půjčky</h2>
+            <div class="card">
+                <table id="reservations-table">
+                    <thead>
+                        <tr>
+                            <th>Název Knihy</th>
+                            <th>Autor</th>
+                            <th>Inv. Číslo</th>
+                            <th>Půjčeno od</th>
+                            <th>Splatnost</th>
+                            <th>Status</th>
+                            <th>Akce</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Půjčky budou naplněny zde -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 Knihovnický informační systém. Všechna práva vyhrazena.</p>
+    </footer>
+
+    <script>
+        const token = localStorage.getItem('token');
+        const user = localStorage.getItem('user');
+
+        if (!token || !user) {
+            window.location.href = '/login';
+        }
+
+        const userData = JSON.parse(user);
+        
+        if (userData.role === 'administrátor') {
+            document.getElementById('admin-link').classList.remove('hidden');
+        }
+
+        async function loadProfile() {
+            try {
+                const response = await fetch('/api/profile/', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    const profileData = await response.json();
+                    displayProfile(profileData);
+                }
+            } catch (error) {
+                showError('Chyba při načítání profilu');
+            }
+        }
+
+        function displayProfile(profile) {
+            document.getElementById('user-name').textContent = profile.full_name || profile.username;
+            document.getElementById('user-role').textContent = profile.role;
+            document.getElementById('user-email').textContent = profile.email || 'Neuvedeno';
+            document.getElementById('user-created').textContent = new Date(profile.created_at).toLocaleDateString('cs-CZ');
+
+            if (profile.reservations) {
+                displayReservations(profile.reservations);
+            }
+        }
+                loadReservations();
+        
+            async function loadReservations() {
+                try {
+                    const response = await fetch('/api/reservations/my', {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+
+                    if (response.ok) {
+                        const reservations = await response.json();
+                        displayReservations(reservations);
+                    } else {
+                        // Prázdný seznam je v pořádku
+                        displayReservations([]);
+                    }
+                } catch (error) {
+                    showError('Chyba při načítání rezervací');
+                }
+            }
+
+        function displayReservations(reservations) {
+            const tbody = document.querySelector('#reservations-table tbody');
+            tbody.innerHTML = '';
+
+            if (reservations.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center">Nemáte žádné půjčky</td></tr>';
+                return;
+            }
+
+            reservations.forEach(reservation => {
+                const row = document.createElement('tr');
+                const statusClass = reservation.status === 'aktivní' ? 'status-active' : 'status-returned';
+                const dueDate = new Date(reservation.due_date);
+                const isOverdue = dueDate < new Date() && reservation.status === 'aktivní';
+                
+                // bezpečně extractovat název a autora
+                const bookTitle = reservation.book_copy?.book?.title || 'Neznámá';
+                const bookAuthor = reservation.book_copy?.book?.author || 'Neznámý';
+                const invNumber = reservation.book_copy?.inventory_number || 'N/A';
+
+                row.innerHTML = `
+                    <td>${bookTitle}</td>
+                    <td>${bookAuthor}</td>
+                    <td>${invNumber}</td>
+                    <td>${new Date(reservation.reservation_date).toLocaleDateString('cs-CZ')}</td>
+                    <td>${dueDate.toLocaleDateString('cs-CZ')}</td>
+                    <td>
+                        <span class="status ${statusClass}">
+                            ${isOverdue ? 'Zpoždění' : (reservation.status === 'aktivní' ? 'Aktivní' : 'Vráceno')}
+                        </span>
+                    </td>
+                    <td>
+                        ${reservation.status === 'aktivní' ? 
+                            `<button onclick="returnBook(${reservation.id})" class="btn btn-secondary" style="width: auto; padding: 0.5rem 1rem;">Vrátit</button>` 
+                            : ''}
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        async function returnBook(reservationId) {
+            if (!confirm('Opravdu chcete vrátit tuto knihu?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/reservations/return', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        reservation_id: reservationId
+                    })
+                });
+
+                if (response.ok) {
+                    showSuccess('Kniha byla vrácena!');
+                    loadProfile();
+                } else {
+                    const error = await response.json();
+                    showError(error.detail || 'Chyba při vrácení knihy');
+                }
+            } catch (error) {
+                showError('Chyba při komunikaci se serverem');
+            }
+        }
+
+        const passwordForm = document.getElementById('password-form');
+        passwordForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const oldPassword = document.getElementById('old-password').value;
+            const newPassword = document.getElementById('new-password').value;
+
+            if (newPassword.length < 6) {
+                showError('Nové heslo musí mít alespoň 6 znaků');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/profile/change-password', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        old_password: oldPassword,
+                        new_password: newPassword
+                    })
+                });
+
+                if (response.ok) {
+                    showSuccess('Heslo bylo úspěšně změněno!');
+                    passwordForm.reset();
+                } else {
+                    const error = await response.json();
+                    showError(error.detail || 'Chyba při změně hesla');
+                }
+            } catch (error) {
+                showError('Chyba při komunikaci se serverem');
+            }
+        });
+
+        function showError(message) {
+            const errorMessage = document.getElementById('error-message');
+            errorMessage.textContent = message;
+            errorMessage.classList.remove('hidden');
+            setTimeout(() => errorMessage.classList.add('hidden'), 5000);
+        }
+
+        function showSuccess(message) {
+            const successMessage = document.getElementById('success-message');
+            successMessage.textContent = message;
+            successMessage.classList.remove('hidden');
+            setTimeout(() => successMessage.classList.add('hidden'), 5000);
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+        }
+
+        loadProfile();
+    </script>
+</body>
+</html>

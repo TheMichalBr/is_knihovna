@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Katalog Knih - Knihovnický IS</title>
+    <link rel="icon" href="/static/icon.png" type="image/png">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header>
+        <nav>
+            <a class="logo" href="/">IS Knihovny</a>
+            <ul>
+                <li><a href="/catalog">Katalog</a></li>
+                <li><a href="/profile">Profil</a></li>
+                <li><a id="admin-link" href="/admin" class="hidden">Admin</a></li>
+                <li><a href="#" onclick="logout()">Odhlásit se</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="container">
+            <h1>Katalog Knih</h1>
+
+            <div class="card mb-3">
+                <div class="search-row">
+                    <input type="text" id="search-input" placeholder="Hledat (název, autor, ISBN)...">
+                    <input type="text" id="filter-author" placeholder="Autor">
+                    <input type="text" id="filter-category" placeholder="Kategorie">
+                    <input type="number" id="filter-year-from" placeholder="Rok od">
+                    <input type="number" id="filter-year-to" placeholder="Rok do">
+                    <label style="display:flex; align-items:center; gap:6px;"><input type="checkbox" id="filter-available"> Jen dostupné</label>
+                </div>
+                <div style="margin-top:8px;">
+                    <button onclick="searchBooks()" class="btn btn-primary">Hledat</button>
+                    <button onclick="resetFilters()" class="btn btn-secondary">Reset</button>
+                </div>
+            </div>
+
+            <div id="error-message" class="alert alert-error hidden"></div>
+            <div id="success-message" class="alert alert-success hidden"></div>
+
+            <div id="books-container" class="grid">
+                <!-- Knihy budou naplněny zde pomocí JavaScriptu -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal pro detaily knihy -->
+    <div id="book-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2 id="modal-title"></h2>
+            <div id="modal-body">
+                <!-- Detaily knihy -->
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2025. Všechna práva vyhrazena.</p>
+    </footer>
+
+    <style>
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.hidden {
+            display: none;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .close {
+            color: var(--primary-green);
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: var(--light-green);
+        }
+    </style>
+
+    <script>
+        const token = localStorage.getItem('token');
+        const user = localStorage.getItem('user');
+
+        if (!token || !user) {
+            window.location.href = '/login';
+        }
+
+        const userData = JSON.parse(user);
+        
+        if (userData.role === 'administrátor') {
+            document.getElementById('admin-link').classList.remove('hidden');
+        }
+
+        async function loadBooks(params = {}) {
+            try {
+                // build query string from params
+                const qs = new URLSearchParams();
+                if (params.search) qs.append('search', params.search);
+                if (params.title) qs.append('title', params.title);
+                if (params.author) qs.append('author', params.author);
+                if (params.category) qs.append('category', params.category);
+                if (params.year_from) qs.append('year_from', params.year_from);
+                if (params.year_to) qs.append('year_to', params.year_to);
+                if (typeof params.available !== 'undefined') qs.append('available', params.available);
+
+                const url = '/api/books/' + (qs.toString() ? ('?' + qs.toString()) : '');
+                const response = await fetch(url, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    const books = await response.json();
+                    displayBooks(books);
+                } else {
+                    showError('Chyba při načítání knih');
+                }
+            } catch (error) {
+                showError('Chyba při komunikaci se serverem');
+            }
+        }
+
+        function displayBooks(books) {
+            const container = document.getElementById('books-container');
+            container.innerHTML = '';
+
+            if (books.length === 0) {
+                container.innerHTML = '<p>Žádné knihy nenalezeny</p>';
+                return;
+            }
+
+            books.forEach(book => {
+                const bookCard = document.createElement('div');
+                bookCard.className = 'card book-card';
+                bookCard.innerHTML = `
+                    <div>
+                        <h3>${book.title}</h3>
+                        <div class="book-meta">
+                            <div><strong>Autor:</strong> ${book.author}</div>
+                            <div><strong>ISBN:</strong> ${book.isbn}</div>
+                            <div><strong>Kategorie:</strong> ${book.category || 'Neuvedena'}</div>
+                        </div>
+                    </div>
+                    <div class="book-actions">
+                        <button onclick="showBookDetails(${book.id})" class="btn btn-primary">Zobrazit detaily</button>
+                    </div>
+                `;
+                container.appendChild(bookCard);
+            });
+        }
+
+        async function showBookDetails(bookId) {
+            const modal = document.getElementById('book-modal');
+            document.getElementById('modal-body').innerHTML = `
+                <div style="display:flex; align-items:center; justify-content:center; height:200px;">
+                    <div style="text-align:center;">
+                        <div style="font-size:2rem; margin-bottom:1rem;">⏳</div>
+                        <p>Načítání detailů...</p>
+                    </div>
+                </div>
+            `;
+            modal.classList.remove('hidden');
+            
+            try {
+                const response = await fetch(`/api/books/${bookId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    const book = await response.json();
+                    
+                    // Načíst exempláře
+                    const copiesResponse = await fetch(`/api/books/${bookId}/copies`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+
+                    let copies = [];
+                    if (copiesResponse.ok) {
+                        copies = await copiesResponse.json();
+                    }
+
+                    const modal = document.getElementById('book-modal');
+                    document.getElementById('modal-title').textContent = book.title;
+
+                    let copiesHtml = '';
+                    if (copies.length > 0) {
+                        copiesHtml = `
+                            <h4>Dostupné exempláře:</h4>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Inv. číslo</th>
+                                        <th>Stav</th>
+                                        <th>Dostupnost</th>
+                                        <th>Akce</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${copies.map(copy => `
+                                        <tr>
+                                            <td>${copy.inventory_number}</td>
+                                            <td>${copy.condition}</td>
+                                            <td>
+                                                <span class="status ${copy.is_available ? 'status-available' : 'status-unavailable'}">
+                                                    ${copy.is_available ? 'Dostupné' : 'Nedostupné'}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                ${copy.is_available ? 
+                                                    `<button onclick="borrowBook(${copy.id})" class="btn btn-secondary" style="width: auto; padding: 0.5rem 1rem;">Půjčit si</button>` 
+                                                    : ''}
+                                                ${(['knihovník','administrátor'].includes(userData.role)) ? `
+                                                    <div style="margin-top:6px;">
+                                                        <select id="cond-${copy.id}">
+                                                            <option value="dobrá" ${copy.condition === 'dobrá' ? 'selected' : ''}>dobrá</option>
+                                                            <option value="přijatelná" ${copy.condition === 'přijatelná' ? 'selected' : ''}>přijatelná</option>
+                                                            <option value="poškozená" ${copy.condition === 'poškozená' ? 'selected' : ''}>poškozená</option>
+                                                        </select>
+                                                        <button onclick="changeCondition(${copy.id})" class="btn btn-tertiary" style="margin-left:6px;">Upravit stav</button>
+                                                    </div>
+                                                ` : ''}
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        `;
+                    }
+
+                    // compute availability summary
+                    const totalCopies = copies.length;
+                    const availableCopies = copies.filter(c => c.is_available).length;
+                    const conditionMap = copies.reduce((acc, c) => { acc[c.condition] = (acc[c.condition] || 0) + 1; return acc; }, {});
+
+                    function renderConditions(map){
+                        return Object.entries(map).map(([k,v]) => `<div style="margin-right:10px;"><strong>${k}:</strong> ${v}</div>`).join('');
+                    }
+
+                    const cover = book.cover_url ? `<img src="${book.cover_url}" alt="cover" style="width:120px; border-radius:8px;">` : `<div style="width:120px; height:160px; background: linear-gradient(135deg, var(--lightest-green), #fff); display:flex; align-items:center; justify-content:center; border-radius:8px; font-weight:700; color:var(--primary-green);">${(book.title||'?').split(' ').slice(0,2).map(w=>w[0]).join('')}</div>`;
+
+                    document.getElementById('modal-body').innerHTML = `
+                        <div style="display:flex; gap:1rem; align-items:flex-start;">
+                            <div style="flex:0 0 120px;">${cover}</div>
+                            <div style="flex:1">
+                                <h3 style="margin-top:0; margin-bottom:6px;">${book.title}</h3>
+                                <div class="book-meta" style="display:flex; gap:1rem; flex-wrap:wrap;">
+                                    <div><strong>Autor:</strong> ${book.author}</div>
+                                    <div><strong>ISBN:</strong> ${book.isbn} <button class="btn-tertiary" onclick="copyISBN('${book.isbn}')">Kopírovat</button></div>
+                                    <div><strong>Vydavatel:</strong> ${book.publisher || 'Neuvedeno'}</div>
+                                    <div><strong>Rok:</strong> ${book.publication_year || 'Neuvedeno'}</div>
+                                    <div><strong>Stran:</strong> ${book.pages || 'Neuvedeno'}</div>
+                                    <div><strong>Kategorie:</strong> ${book.category || 'Neuvedena'}</div>
+                                </div>
+
+                                <div style="margin-top:0.75rem; display:flex; gap:1rem; align-items:center;">
+                                    <div><strong>Celkem exemplářů:</strong> ${totalCopies}</div>
+                                    <div><strong>Dostupné:</strong> ${availableCopies}</div>
+                                    <div style="display:flex; align-items:center;">${renderConditions(conditionMap)}</div>
+                                </div>
+
+                                <div style="margin-top:0.75rem; color:#444; white-space:pre-line;">${book.description || 'Žádný popis'}</div>
+
+                                <div style="margin-top:1rem;" id="book-actions-area">
+                                    ${copiesHtml}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    // if librarian/admin allow quick add copy
+                    if (['knihovník','administrátor'].includes(userData.role)){
+                        const actionsArea = document.getElementById('book-actions-area');
+                        const addBtn = document.createElement('button');
+                        addBtn.className = 'btn btn-secondary';
+                        addBtn.textContent = 'Přidat exemplář (automatické inv.)';
+                        addBtn.onclick = async () => {
+                            try{
+                                const inv = `${book.id}-${Date.now()}`;
+                                const resp = await fetch(`/api/books/${book.id}/copies`, {
+                                    method: 'POST',
+                                    headers: {'Authorization': `Bearer ${token}`, 'Content-Type':'application/json'},
+                                    body: JSON.stringify({ inventory_number: inv, condition: 'dobrá' })
+                                });
+                                if (resp.ok){
+                                    showSuccess('Exemplář přidán');
+                                    showBookDetails(book.id);
+                                } else {
+                                    const er = await resp.json(); showError(er.detail || 'Chyba při přidávání');
+                                }
+                            }catch(e){showError('Chyba při komunikaci');}
+                        };
+                        actionsArea.prepend(addBtn);
+                    }
+
+                    modal.classList.remove('hidden');
+                }
+            } catch (error) {
+                showError('Chyba při načítání detailů knihy');
+            }
+        }
+
+        async function borrowBook(copyId) {
+            try {
+                const response = await fetch(`/api/reservations/borrow/${copyId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    showSuccess('Kniha byla úspěšně půjčena!');
+                    closeModal();
+                    loadBooks();
+                } else {
+                    const error = await response.json();
+                    showError(error.detail || 'Chyba při půjčení knihy');
+                }
+            } catch (error) {
+                showError('Chyba při komunikaci se serverem');
+            }
+        }
+
+        function copyISBN(isbn) {
+            try {
+                navigator.clipboard.writeText(isbn);
+                showSuccess('ISBN zkopírováno do schránky');
+            } catch (e) {
+                showError('Problém s kopírováním ISBN');
+            }
+        }
+
+        function searchBooks() {
+            const params = {
+                search: document.getElementById('search-input').value || undefined,
+                author: document.getElementById('filter-author').value || undefined,
+                category: document.getElementById('filter-category').value || undefined,
+                year_from: document.getElementById('filter-year-from').value || undefined,
+                year_to: document.getElementById('filter-year-to').value || undefined,
+                available: document.getElementById('filter-available').checked ? true : undefined
+            };
+            loadBooks(params);
+        }
+
+        function resetFilters() {
+            document.getElementById('search-input').value = '';
+            document.getElementById('filter-author').value = '';
+            document.getElementById('filter-category').value = '';
+            document.getElementById('filter-year-from').value = '';
+            document.getElementById('filter-year-to').value = '';
+            document.getElementById('filter-available').checked = false;
+            loadBooks();
+        }
+
+        async function changeCondition(copyId) {
+            const sel = document.getElementById(`cond-${copyId}`);
+            if (!sel) return;
+            const condition = sel.value;
+            try {
+                const response = await fetch(`/api/books/copies/${copyId}/condition`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ condition })
+                });
+
+                if (response.ok) {
+                    showSuccess('Stav exempláře byl upraven');
+                    closeModal();
+                    loadBooks();
+                } else {
+                    const err = await response.json();
+                    showError(err.detail || 'Chyba při změně stavu');
+                }
+            } catch (err) {
+                showError('Chyba při komunikaci se serverem');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('book-modal').classList.add('hidden');
+        }
+
+        function showError(message) {
+            const errorMessage = document.getElementById('error-message');
+            errorMessage.textContent = message;
+            errorMessage.classList.remove('hidden');
+            setTimeout(() => errorMessage.classList.add('hidden'), 5000);
+        }
+
+        function showSuccess(message) {
+            const successMessage = document.getElementById('success-message');
+            successMessage.textContent = message;
+            successMessage.classList.remove('hidden');
+            setTimeout(() => successMessage.classList.add('hidden'), 5000);
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+        }
+
+        // Inicializace
+        loadBooks();
+    </script>
+</body>
+</html>
