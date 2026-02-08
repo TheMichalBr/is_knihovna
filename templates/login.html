@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Přihlášení - Knihovnický IS</title>
+    <title>Přihlášení - Knihovnický Informační Systém</title>
     <link rel="icon" href="/static/icon.png" type="image/png">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
@@ -28,26 +28,31 @@
                 <form id="login-form">
                     <div class="form-group">
                         <label for="username">Uživatelské jméno</label>
-                        <input type="text" id="username" name="username" required>
+                        <input type="text" id="username" name="username" placeholder="Vaše jméno" required autofocus>
                     </div>
 
                     <div class="form-group">
                         <label for="password">Heslo</label>
-                        <input type="password" id="password" name="password" required>
+                        <input type="password" id="password" name="password" placeholder="Vaše heslo" required>
                     </div>
 
-                    <button type="submit" class="btn btn-primary">Přihlásit se</button>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Přihlásit se</button>
                 </form>
 
-                <p class="text-center mt-3">
-                    <small>Pokud nemáte účet, prosím kontaktujte administrátora knihovny.</small>
-                </p>
+                <div style="text-align: center; margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border-color);">
+                    <p style="color: var(--text-light); margin-bottom: 0.75rem;">
+                        Pokud nemáte přístupové údaje,
+                    </p>
+                    <p style="font-size: 0.95rem; color: var(--text-color);">
+                        prosím <strong>kontaktujte administrátora knihovny.</strong>
+                    </p>
+                </div>
             </div>
         </div>
     </main>
 
     <footer>
-        <p>&copy; 2025 Knihovnický informační systém. Všechna práva vyhrazena.</p>
+        <p>&copy; 2026 Knihovnícký Informační Systém. Všechna práva vyhrazena.</p>
     </footer>
 
     <script>
